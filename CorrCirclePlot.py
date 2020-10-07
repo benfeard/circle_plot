@@ -15,10 +15,21 @@ and easier to understand plot.
 Please see generateBaseFile.py to produce an appropriate input file based on FASTA data.
 
 ver. 0.1 - Sat Aug 8, 2020
+ver. 0.2 - Wed Oct 7, 2020
 """
 
 import sys
 import math
+
+def readCT(ct_file):
+    #reads a ct file, !reqires header!
+    num,seq,bp = [],[],[]
+    linesToRead = int(open(ct_file).readlines()[0].rstrip().split()[0])
+    
+    for i in open(ct_file).readlines()[1:linesToRead+1]:
+        a = i.rstrip().split()
+        num.append(int(a[0])),seq.append(str(a[1])),bp.append(int(a[4]))
+    return num,seq,bp
 
 def processCorrData(input):
     #Read and store Cross Correlation data where i,j are residue pairs as dictionary
@@ -32,12 +43,39 @@ def processCorrData(input):
         corr = float(line[2])
         formattedData['i'].append(i)
         formattedData['j'].append(j)
-        formattedData[]'corr'].append(corr)
+        formattedData['corr'].append(corr)
         
     return formattedData
-    
 
-def makeCircle(ct_pred, ct_correct, corrData, offset=1):
+def genCorrelString(corrData):
+    """
+    correlDat is a dict. i, j, correl are names.
+    """
+    
+    line = ""
+    count = 0
+    length = len(corrData['i'])
+    for num in xrange(length):
+        if corrData['j'][num] >= 0.10:
+            line += '[{0} {1} 0.00 0.50 0.00 {2}]\n'.format(corrData['i'][num],corrData['j'][num],0)
+            count += 1
+        if corrData['j'][num] <= -0.04:
+            line += '[{0} {1} 0.80 0.10 0.80 {2}]\n'.format(corrData['i'][num],corrData['j'][num],0)
+            count += 1
+            
+    return line, count    
+
+def getScaleFactor(length):
+    """
+    calculates the scaling factor. Was determined heuristically from a range or RNA sizes in CircleCompair
+    """
+    
+    if length > 76:
+        return 74.0875 / float(length) + 0.020367
+    else:
+        return -1.06*math.log10(length) + 5.44
+
+def makeCircle(num, seq, bp, corrData, offset=1):
     """
     function to make a circleplot from two structures, shannon and shape reactivity and slip status.
     diffColor uses the differential coloring scale based on a slope and intercept of 1 and -1. offset
@@ -46,24 +84,28 @@ def makeCircle(ct_pred, ct_correct, corrData, offset=1):
     returns postscript file lines as a string
     """
 
-    correct, missing, extra, bpCorrect = compareRNA(ct_pred, ct_correct)
+    correct = (min(num), max(num))
+    missing = []
+    extra = []
+    bpCorrect = 1
+    #correct, missing, extra, bpCorrect = compareRNA(ct_pred, ct_correct)
     
+    ct_length = len(seq)
+    Coloring = "[0.00 0.00 0.00]\n" * ct_length
     
-    Coloring = "[0.00 0.00 0.00]\n" * len(ct_pred.ct)
-    
-    pairingTable, = "[1 " + str(len(ct_pred.ct)) + " 0.80 0.80 0.80 0]\n" #numbers are the color
+    pairingTable = "[1 " + str(ct_length) + " 0.80 0.80 0.80 0]\n" #numbers are the color
     numPairs = 0 #might need to be set equal to 1
     
-    pairingTableCorrel, numPairsCorrel = genCorrelString(correlDat)
+    pairingTableCorrel, numPairsCorrel = genCorrelString(corrData)
     
     # add the new correlations to the pairing array
     pairingTable += pairingTableCorrel
     numPairs += numPairsCorrel
     #print pairingTable
-    scaleFactor = getScaleFactor(len(ct_correct.ct))
+    scaleFactor = getScaleFactor(ct_length)
     
     # heuristically based on circlecompare
-    cirRadius = 3*len(ct_correct.ct)+14
+    cirRadius = 3 * ct_length + 14
     
     sens = bpCorrect/float(len(correct)+len(missing))
     ppv = bpCorrect/float(len(correct)+len(extra))
@@ -96,9 +138,9 @@ def makeCircle(ct_pred, ct_correct, corrData, offset=1):
 
 % Create the array of nucleotides.
 /bases [
-""".format(len(ct_correct.ct),scaleFactor,cirRadius)
+""".format(ct_length,scaleFactor,cirRadius)
 
-    Circle += ' '.join(map('({0})'.format, ct_correct.seq)) # lists sequence as '(A) (G)...'
+    Circle += ' '.join(map('({0})'.format, seq)) # lists sequence as '(A) (G)...'
     Circle +="""
 ] def
 
@@ -128,7 +170,7 @@ def makeCircle(ct_pred, ct_correct, corrData, offset=1):
 descriptors {{ aload pop moveto setrgbcolor show }} forall
 
 % Write the array of annotation colors.
-/annotations [ """.format(numPairs, ct_pred.name, ct_correct.name)
+/annotations [ """.format(numPairs, sys.argv[1], sys.argv[1])
     Circle += Coloring
     Circle += """] def
 
@@ -262,7 +304,7 @@ translateFactorX translateFactorY translate
 
 
  % Set variables handling number, placement of nucleotides.
- /numBasesf {1}""".format(numPairs,len(ct_correct.ct),offset)
+ /numBasesf {1}""".format(numPairs,ct_length,offset)
     Circle += """ def
  /currentBasef 0 def
  /basePointsf numBasesf array def
@@ -280,7 +322,7 @@ translateFactorX translateFactorY translate
  
  /basesf [ """
  
-    Circle += ' '.join(map('()'.format, ct_correct.seq))
+    Circle += ' '.join(map('()'.format, seq))
     Circle += """
 
  ] def
@@ -372,11 +414,11 @@ if __name__ == '__main__':
         print 'Usage: CorrCirclePlot.py structureFile corrData outputPlot.ps'
         sys.exit()
 
-    ct_pred = CT(sys.argv[1])
-    
+    num, seq, bp = readCT(sys.argv[1])
+
     corrData = processCorrData(sys.argv[2]) #done and updated
     
-    circleLines = makeCircle(ct_pred, ct_pred, corrData, offset=1) #look into the two ct_pred
+    circleLines = makeCircle(num, seq, bp, corrData, offset=1) #look into the two ct_pred
     
     outputPlot = open(sys.argv[3],'w')
     outputPlot.write(circleLines)
