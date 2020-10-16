@@ -15,3 +15,7 @@ It is recommended to minimize the number of correlations included to produce a c
 ## Process_raw_crosscorr.py
 
 If you have used [Wordom](http://wordom.sourceforge.net) to generate the cross-correlation data for your protein, this script can help format it for the Circle Plot.
+
+## GenerateBaseFile.py
+
+This will take a protein FASTA file and give you the proper CT formatted file. This is an adapation of formats used for RNA and basepair encoding.
