@@ -1,8 +1,8 @@
 # Circle Plots for Cross-Correlations
 
-This is an update version of the code used in DOI:https://doi.org/10.1016/j.bpj.2017.08.026 
+This is an updated version of my code used in DOI:https://doi.org/10.1016/j.bpj.2017.08.026 
 
-Please read the research article for the full methods behind this approach.
+Please read my research article for the full methods behind this approach.
 
 ## CrossCirclePlot.py
 
